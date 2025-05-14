@@ -1,0 +1,16 @@
+version: '3'
+services:
+  jdk_codeql:
+    build: .
+    container_name: jdk_codeql_builder
+    environment:
+      - TZ=Asia/Shanghai
+      - DISABLE_HOTSPOT_OS_VERSION_CHECK=ok
+      - AUTO_BUILD=true
+    volumes:
+      - ./data/bootjdk:/app/bootjdk
+      - ./data/source:/app/source
+      - ./data/codeql:/app/codeql
+      - ./data/database:/app/database
+    tty: true
+    stdin_open: true
