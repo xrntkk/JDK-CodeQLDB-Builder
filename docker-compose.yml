@@ -7,10 +7,15 @@ services:
       - TZ=Asia/Shanghai
       - DISABLE_HOTSPOT_OS_VERSION_CHECK=ok
       - AUTO_BUILD=true
+      - BUILD_MODE=hybrid   # 支持: hybrid | jdk_only | user_only
+      - DB_NAME=hybrid      # 输出数据库名字
+      - JDK_FULL_VERSION="8u111"  # 完整版本号，这里使用 JDK 8u111 版本
+      - JDK_VERSION=8 # 主版本号: 8, 11, 17, 21
     volumes:
       - ./data/bootjdk:/app/bootjdk
       - ./data/source:/app/source
       - ./data/codeql:/app/codeql
       - ./data/database:/app/database
+      - ./data/user-source:/app/user-source
     tty: true
     stdin_open: true
