@@ -49,17 +49,23 @@ jdk-codeql-builder/
 
 ### 3. 准备目录和文件
 
+Linux/macOS 创建目录示例：
 ```bash
-# 创建必要的目录
 mkdir -p data/bootjdk data/source data/codeql data/database data/user-source/lib
+```
 
-# 放置必要文件
+windows 创建目录示例：
+```bat
+mkdir data\bootjdk && mkdir data\source && mkdir data\codeql && mkdir data\database && mkdir data\user-source\lib
+```
+
+### 4. 放置必要文件
+
 1. 将 CodeQL CLI 解压到 `data/codeql/` 目录
 2. 将引导 JDK 的 `.tar.gz`（Linux x64）直接放入 `data/bootjdk/`，或将已解压的 JDK 目录放入该目录
 3. 将要分析的 Java 程序放入 `data/user-source/`；`data/source/` 可留空（将自动下载 OpenJDK 源码）。
-```
 
-### 4. 启动构建
+### 5. 启动构建
 
 ```bash
 docker-compose up --build
@@ -176,4 +182,3 @@ bash /app/scripts/build-db.sh
    - 内存不足：检查 Docker 资源配额
    - 网络问题：检查 JDK 源码下载连接
    - 版本冲突：确认引导 JDK 版本是否匹配
-
