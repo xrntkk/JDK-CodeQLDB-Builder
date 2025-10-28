@@ -1,6 +1,6 @@
 # CodeQL 数据库构建工具
 
-> 本项目基于 [h3h3qaq/JDK-CodeQLDB-Builder](https://github.com/h3h3qaq/JDK-CodeQLDB-Builder) 改造，新增了使用 Ant 构建用户 Java 项目并通过 CodeQL CLI 提取数据库的方式。完全使用Claude3.5进行修改，有问题找Claude3.5解决。
+> 本项目基于 [h3h3qaq/JDK-CodeQLDB-Builder](https://github.com/h3h3qaq/JDK-CodeQLDB-Builder) 改造，如有问题请联系删除，新增了使用 Ant 构建用户 Java 项目并通过 CodeQL CLI 提取数据库的方式。完全使用Claude3.5进行修改(包括Readme)，有问题找Claude3.5解决。
 
 本工具提供了一个基于 Docker 的环境，在同一条 CodeQL 提取命令中：先构建 OpenJDK（`configure` + `make`），随后编译你的 Java 项目（Ant）。提取器一次性拦截整个构建过程，生成单一数据库。若缺少 JDK 源码，将自动调用下载脚本获取。
 
