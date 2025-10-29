@@ -27,6 +27,7 @@
 
 ### 🔧 **企业级功能**
 - **多 Boot JDK 管理**: 支持同时管理多个 JDK 版本
+- **CodeQL 自动化**: 自动下载、安装和更新 CodeQL CLI
 - **数据库压缩**: 自动压缩生成的 CodeQL 数据库
 - **文件上传**: 支持 JAR 文件上传和自动反编译
 - **构建中断**: 支持构建过程的安全中断和恢复
@@ -102,7 +103,9 @@ jdk-codeql-builder/
 
 **必需组件:**
 ```bash
-# 下载 CodeQL CLI
+# CodeQL CLI 自动下载
+# 系统会自动检测并下载 CodeQL CLI，无需手动操作
+# 如需手动下载：
 wget https://github.com/github/codeql-cli-binaries/releases/latest/download/codeql-linux64.zip
 unzip codeql-linux64.zip -d data/codeql/
 
@@ -152,6 +155,7 @@ docker-compose up -d --build
 
 **主要功能:**
 - 📊 **构建管理**: 选择 Boot JDK、配置构建参数
+- 🔧 **CodeQL 管理**: 自动下载、安装和管理 CodeQL CLI
 - 📈 **实时监控**: 查看构建进度和系统状态
 - 📋 **历史记录**: 浏览构建历史和结果
 - 📁 **文件管理**: 上传 JAR 文件、管理数据库压缩包
@@ -238,6 +242,27 @@ docker exec jdk_codeql_builder /app/scripts/cache-manager.sh status
 docker exec jdk_codeql_builder /app/scripts/cache-manager.sh clean
 ```
 
+### CodeQL 管理
+
+系统提供完整的 CodeQL CLI 自动化管理:
+
+```bash
+# 检查 CodeQL 状态
+curl http://localhost:8085/api/codeql/status
+
+# 手动触发 CodeQL 下载
+curl -X POST http://localhost:8085/api/codeql/download
+
+# 确保 CodeQL 可用（自动下载如果不存在）
+curl -X POST http://localhost:8085/api/codeql/ensure
+```
+
+**自动化特性:**
+- ✅ 启动时自动检测 CodeQL 是否可用
+- ✅ 构建前自动下载 CodeQL CLI（如果缺失）
+- ✅ Web 界面实时显示 CodeQL 状态
+- ✅ 支持手动重新下载和更新
+
 ### Boot JDK 管理
 
 支持多版本 JDK 并存:
@@ -312,7 +337,22 @@ docker exec jdk_codeql_builder tail -f /app/logs/build_*.log
 docker exec jdk_codeql_builder ls -la /app/bootjdk
 ```
 
-#### 4. 内存不足
+#### 5. CodeQL 相关问题
+```bash
+# 检查 CodeQL 安装状态
+curl http://localhost:8085/api/codeql/status
+
+# 重新下载 CodeQL CLI
+curl -X POST http://localhost:8085/api/codeql/download
+
+# 检查 CodeQL 目录权限
+docker exec jdk_codeql_builder ls -la /app/codeql
+
+# 手动验证 CodeQL 可执行性
+docker exec jdk_codeql_builder /app/codeql/codeql version
+```
+
+#### 6. 内存不足
 ```bash
 # 监控资源使用
 docker stats jdk_codeql_builder
@@ -415,7 +455,14 @@ git commit -m "docs: 更新 API 文档"
 
 ## 📈 更新日志
 
-### v2.1.0 (最新)
+### v2.2.0 (最新)
+- 🆕 **CodeQL 自动下载**: 系统自动检测并下载 CodeQL CLI
+- 🔧 **Web 界面增强**: 新增 CodeQL 管理界面和状态监控
+- 📊 **API 扩展**: 新增 CodeQL 管理相关 API 端点
+- 🚀 **构建优化**: 构建前自动确保 CodeQL 可用性
+- 📝 **文档更新**: 完善 CodeQL 自动化功能说明
+
+### v2.1.0
 - 🆕 重构 README 文档结构
 - 🔧 优化 Web 界面响应式设计
 - 📊 增强构建性能监控

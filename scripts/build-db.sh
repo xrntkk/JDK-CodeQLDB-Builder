@@ -18,9 +18,26 @@ if [ ! -d /app/bootjdk ] || [ -z "$(ls -A /app/bootjdk)" ]; then
     exit 1
 fi
 
+# 检查CodeQL是否存在，如果不存在则自动下载
 if [ ! -d /app/codeql ] || [ -z "$(ls -A /app/codeql)" ]; then
-    echo "Error: CodeQL directory empty or not found at /app/codeql"
-    exit 1
+    echo "CodeQL directory empty or not found at /app/codeql"
+    echo "Attempting to download CodeQL automatically..."
+    
+    # 运行CodeQL下载器
+    if [ -f /app/scripts/codeql-downloader.sh ]; then
+        chmod +x /app/scripts/codeql-downloader.sh
+        if /app/scripts/codeql-downloader.sh; then
+            echo "CodeQL downloaded successfully"
+        else
+            echo "Error: Failed to download CodeQL automatically"
+            echo "Please manually download CodeQL from: https://github.com/github/codeql-cli-binaries/releases/latest"
+            exit 1
+        fi
+    else
+        echo "Error: CodeQL downloader script not found"
+        echo "Please manually download CodeQL from: https://github.com/github/codeql-cli-binaries/releases/latest"
+        exit 1
+    fi
 fi
 
 USR_PRESENT=false

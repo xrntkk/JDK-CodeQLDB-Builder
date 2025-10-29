@@ -254,6 +254,30 @@
                     </div>
                 </div>
 
+                <!-- CodeQL管理 -->
+                <div class="gradient-bg-3 rounded-xl p-6 text-white shadow-lg">
+                    <h2 class="text-lg font-semibold mb-4 flex items-center">
+                        <i class="bi bi-code-square mr-2"></i>
+                        CodeQL管理
+                    </h2>
+                    <div id="codeqlStatus" class="mb-4">
+                        <p class="opacity-90">检查中...</p>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button onclick="checkCodeQLStatus()" 
+                                class="bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg transition-all duration-200 flex items-center">
+                            <i class="bi bi-arrow-clockwise mr-2"></i>
+                            检查状态
+                        </button>
+                        <button onclick="downloadCodeQL()" 
+                                id="downloadCodeQLBtn"
+                                class="bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg transition-all duration-200 flex items-center">
+                            <i class="bi bi-download mr-2"></i>
+                            下载CodeQL
+                        </button>
+                    </div>
+                </div>
+
                 <!-- 构建配置 -->
                 <div class="bg-white rounded-xl shadow-lg overflow-hidden">
                     <div class="bg-gray-50 px-6 py-4 border-b">
@@ -1340,6 +1364,103 @@
                 alert('中断失败: ' + error.message);
             }
         }
+
+        // CodeQL管理函数
+        async function checkCodeQLStatus() {
+            try {
+                const response = await fetch('/api/codeql/status');
+                const status = await response.json();
+                
+                const statusDiv = document.getElementById('codeqlStatus');
+                const downloadBtn = document.getElementById('downloadCodeQLBtn');
+                
+                if (status.installed) {
+                    statusDiv.innerHTML = `
+                        <div class="flex items-center">
+                            <i class="bi bi-check-circle-fill text-green-300 mr-2"></i>
+                            <span>已安装: ${status.version || '未知版本'}</span>
+                        </div>
+                        <div class="text-sm opacity-75 mt-1">路径: ${status.path}</div>
+                    `;
+                    downloadBtn.style.display = 'none';
+                } else {
+                    statusDiv.innerHTML = `
+                        <div class="flex items-center">
+                            <i class="bi bi-exclamation-triangle-fill text-yellow-300 mr-2"></i>
+                            <span>未安装或不可用</span>
+                        </div>
+                        <div class="text-sm opacity-75 mt-1">需要下载CodeQL CLI</div>
+                    `;
+                    downloadBtn.style.display = 'flex';
+                }
+            } catch (error) {
+                document.getElementById('codeqlStatus').innerHTML = `
+                    <div class="flex items-center">
+                        <i class="bi bi-x-circle-fill text-red-300 mr-2"></i>
+                        <span>检查失败: ${error.message}</span>
+                    </div>
+                `;
+            }
+        }
+
+        async function downloadCodeQL() {
+            const downloadBtn = document.getElementById('downloadCodeQLBtn');
+            const statusDiv = document.getElementById('codeqlStatus');
+            
+            // 禁用按钮并显示下载状态
+            downloadBtn.disabled = true;
+            downloadBtn.innerHTML = '<i class="bi bi-arrow-clockwise animate-spin mr-2"></i>下载中...';
+            
+            statusDiv.innerHTML = `
+                <div class="flex items-center">
+                    <i class="bi bi-arrow-clockwise animate-spin text-blue-300 mr-2"></i>
+                    <span>正在下载CodeQL CLI...</span>
+                </div>
+                <div class="text-sm opacity-75 mt-1">请稍候，这可能需要几分钟</div>
+            `;
+            
+            try {
+                const response = await fetch('/api/codeql/download', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    statusDiv.innerHTML = `
+                        <div class="flex items-center">
+                            <i class="bi bi-check-circle-fill text-green-300 mr-2"></i>
+                            <span>下载成功: ${result.version || '未知版本'}</span>
+                        </div>
+                        <div class="text-sm opacity-75 mt-1">${result.message}</div>
+                    `;
+                    downloadBtn.style.display = 'none';
+                } else {
+                    statusDiv.innerHTML = `
+                        <div class="flex items-center">
+                            <i class="bi bi-x-circle-fill text-red-300 mr-2"></i>
+                            <span>下载失败</span>
+                        </div>
+                        <div class="text-sm opacity-75 mt-1">${result.message}</div>
+                    `;
+                    downloadBtn.disabled = false;
+                    downloadBtn.innerHTML = '<i class="bi bi-download mr-2"></i>下载CodeQL';
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    <div class="flex items-center">
+                        <i class="bi bi-x-circle-fill text-red-300 mr-2"></i>
+                        <span>下载失败: ${error.message}</span>
+                    </div>
+                `;
+                downloadBtn.disabled = false;
+                downloadBtn.innerHTML = '<i class="bi bi-download mr-2"></i>下载CodeQL';
+            }
+        }
+
+        // 页面加载时检查CodeQL状态
+        document.addEventListener('DOMContentLoaded', function() {
+            checkCodeQLStatus();
+        });
     </script>
 </body>
 </html>

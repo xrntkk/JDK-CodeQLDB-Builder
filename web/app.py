@@ -21,11 +21,12 @@ import shutil
 import signal
 import tarfile
 import glob
+from codeql_manager import CodeQLManager
 
 app = Flask(__name__)
 app.secret_key = 'codeql_builder_secret_key'
 
-# 配置路径
+# 路径配置
 BASE_DIR = Path('/app')
 DATA_DIR = BASE_DIR / 'data'
 BOOTJDK_DIR = BASE_DIR / 'bootjdk'
@@ -106,6 +107,9 @@ def extract_boot_jdk_on_startup():
 
 # 在Web应用启动时执行Boot JDK解压
 extract_boot_jdk_on_startup()
+
+# 初始化CodeQL管理器
+codeql_manager = CodeQLManager()
 
 class BuildManager:
     def __init__(self):
@@ -739,6 +743,43 @@ def get_stats():
         'compressed_builds': compressed_builds,
         'compression_rate': round(compression_rate, 2)
     })
+
+# CodeQL管理API端点
+@app.route('/api/codeql/status')
+def get_codeql_status():
+    """获取CodeQL状态"""
+    try:
+        status = codeql_manager.get_status()
+        return jsonify(status)
+    except Exception as e:
+        logging.error(f"Failed to get CodeQL status: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/codeql/download', methods=['POST'])
+def download_codeql():
+    """下载CodeQL CLI"""
+    try:
+        result = codeql_manager.download_codeql()
+        if result['success']:
+            return jsonify(result)
+        else:
+            return jsonify(result), 400
+    except Exception as e:
+        logging.error(f"Failed to download CodeQL: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/codeql/ensure', methods=['POST'])
+def ensure_codeql():
+    """确保CodeQL可用（如果不可用则自动下载）"""
+    try:
+        result = codeql_manager.ensure_codeql_available()
+        if result['success']:
+            return jsonify(result)
+        else:
+            return jsonify(result), 400
+    except Exception as e:
+        logging.error(f"Failed to ensure CodeQL: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080, debug=True)
