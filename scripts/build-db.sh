@@ -2,8 +2,11 @@
 set -euo pipefail
 
 START_TIME=$(date +%s)
-echo "=== CodeQL Database Builder (Hybrid Mode) ==="
+echo "=== CodeQL Database Builder (Enhanced with Caching) ==="
 echo "Starting build at $(date)"
+
+# 导入缓存管理器
+source /app/scripts/cache-manager.sh
 
 USER_SOURCE_DIR="/app/user-source"
 JDK_SOURCE_DIR="/app/source"
@@ -27,8 +30,27 @@ if [ -d "$USER_SOURCE_DIR" ] && [ -n "$(ls -A "$USER_SOURCE_DIR" 2>/dev/null || 
   USR_PRESENT=true
 fi
 
-if [ -d "$JDK_SOURCE_DIR" ] && [ -n "$(ls -A "$JDK_SOURCE_DIR" 2>/dev/null || true)" ]; then
-  JDK_PRESENT=true
+# 计算用户源码哈希（用于缓存）
+USER_SOURCE_HASH="empty"
+if $USR_PRESENT; then
+    USER_SOURCE_HASH=$(calculate_hash "$USER_SOURCE_DIR")
+    echo "User source hash: $USER_SOURCE_HASH"
+fi
+
+# 检查JDK源码缓存
+JDK_VERSION="${JDK_VERSION:-17}"
+JDK_FULL_VERSION="${JDK_FULL_VERSION:-}"
+
+echo "Checking JDK source cache for version $JDK_VERSION $JDK_FULL_VERSION"
+if CACHED_SOURCE=$(check_source_cache "$JDK_VERSION" "$JDK_FULL_VERSION"); then
+    echo "Using cached JDK source: $CACHED_SOURCE"
+    restore_source_cache "$CACHED_SOURCE" "$JDK_SOURCE_DIR"
+    JDK_PRESENT=true
+else
+    echo "No JDK source cache found, will download"
+    if [ -d "$JDK_SOURCE_DIR" ] && [ -n "$(ls -A "$JDK_SOURCE_DIR" 2>/dev/null || true)" ]; then
+        JDK_PRESENT=true
+    fi
 fi
 
 if ! $JDK_PRESENT; then
@@ -38,6 +60,10 @@ if ! $JDK_PRESENT; then
   if [ -d "$JDK_SOURCE_DIR" ] && [ -n "$(ls -A "$JDK_SOURCE_DIR" 2>/dev/null || true)" ]; then
     JDK_PRESENT=true
     echo "[INFO] JDK source downloaded successfully."
+    
+    # 保存到缓存
+    echo "Saving JDK source to cache"
+    save_source_cache "$JDK_VERSION" "$JDK_FULL_VERSION" "$JDK_SOURCE_DIR"
   else
     echo "Error: JDK source still missing after download."
     exit 1
@@ -57,17 +83,38 @@ echo "Database name: $DB_NAME"
 
 # Configure Java
 extract_boot_jdk_if_needed() {
-  local archive
-  archive=$(find /app/bootjdk -maxdepth 1 -type f \( -name "*.tar.gz" -o -name "*.tgz" \) | head -1)
-  if [ -n "$archive" ]; then
-    echo "[INFO] Detected Boot JDK archive: $archive"
-    mkdir -p /app/bootjdk/_extracted
-    echo "[INFO] Extracting Boot JDK archive to /app/bootjdk/_extracted ..."
-    tar -xzf "$archive" -C /app/bootjdk/_extracted
+  # Boot JDK解压现在在Web应用启动时进行，这里只做路径检查
+  if [ "$BUILD_MODE" = "user_only" ]; then
+    echo "[INFO] Skipping Boot JDK extraction in user_only mode"
+    return 0
+  fi
+  
+  # 检查Boot JDK是否已经解压
+  if [ -d "/app/bootjdk/_extracted" ] && [ -n "$(ls -A /app/bootjdk/_extracted 2>/dev/null || true)" ]; then
+    echo "[INFO] Boot JDK already extracted"
+    return 0
+  else
+    echo "[ERROR] Boot JDK not found in /app/bootjdk/_extracted"
+    echo "Please ensure Boot JDK is properly extracted during web initialization"
+    return 1
   fi
 }
 
 resolve_boot_jdk_path() {
+  # 在 user_only 模式下，使用系统 Java 或跳过 Boot JDK 配置
+  if [ "$BUILD_MODE" = "user_only" ]; then
+    # 尝试使用系统 Java 作为 Boot JDK
+    if command -v java >/dev/null 2>&1; then
+      BOOT_JDK_PATH=$(dirname "$(dirname "$(readlink -f "$(command -v java)")")")
+      echo "[INFO] Using system Java as Boot JDK in user_only mode: $BOOT_JDK_PATH"
+      return 0
+    else
+      echo "[WARN] No system Java found in user_only mode, Boot JDK will not be configured"
+      BOOT_JDK_PATH=""
+      return 0
+    fi
+  fi
+  
   if [ -d /app/bootjdk/_extracted ]; then
     BOOT_JDK_PATH=$(find /app/bootjdk/_extracted -maxdepth 2 -type d \( -name "jdk*" -o -name "java-*" -o -name "openjdk*" \) | head -1)
   fi
@@ -86,18 +133,24 @@ resolve_boot_jdk_path
 
 echo "Boot JDK: $BOOT_JDK_PATH"
 
-export JAVA_HOME="$BOOT_JDK_PATH"
-export PATH="$JAVA_HOME/bin:$PATH"
-BOOT_VER_STR=$("$JAVA_HOME/bin/java" -version 2>&1 | head -n1)
-BOOT_MAJOR=""
-if echo "$BOOT_VER_STR" | grep -q '"1\.'; then
-  # Java 8 style: java version "1.8.0_71"
-  BOOT_MAJOR=$(echo "$BOOT_VER_STR" | sed -E 's/.*"1\.([0-9]+)\..*/\1/')
+# 只在非 user_only 模式或有有效 Boot JDK 路径时配置 Java 环境
+if [ "$BUILD_MODE" != "user_only" ] || [ -n "$BOOT_JDK_PATH" ]; then
+  export JAVA_HOME="$BOOT_JDK_PATH"
+  export PATH="$JAVA_HOME/bin:$PATH"
+  BOOT_VER_STR=$("$JAVA_HOME/bin/java" -version 2>&1 | head -n1)
+  BOOT_MAJOR=""
+  if echo "$BOOT_VER_STR" | grep -q '"1\.'; then
+    # Java 8 style: java version "1.8.0_71"
+    BOOT_MAJOR=$(echo "$BOOT_VER_STR" | sed -E 's/.*"1\.([0-9]+)\..*/\1/')
+  else
+    # Java 11+ style: openjdk version "11.0.23"
+    BOOT_MAJOR=$(echo "$BOOT_VER_STR" | sed -E 's/.*"([0-9]+)\..*/\1/')
+  fi
+  echo "Detected Boot JDK major version: ${BOOT_MAJOR:-unknown}"
 else
-  # Java 11+ style: openjdk version "11.0.23"
-  BOOT_MAJOR=$(echo "$BOOT_VER_STR" | sed -E 's/.*"([0-9]+)\..*/\1/')
+  echo "[INFO] Skipping Boot JDK configuration in user_only mode without valid Boot JDK"
+  BOOT_MAJOR=""
 fi
-echo "Detected Boot JDK major version: ${BOOT_MAJOR:-unknown}"
 DESIRED_MAJOR=${CODEQL_RUNTIME_MAJOR:-17}
 echo "Desired CodeQL runtime major: $DESIRED_MAJOR"
 
@@ -160,47 +213,22 @@ ensure_codeql_runtime() {
 
 ensure_codeql_runtime
 
-# Prepare Ant build for USER sources only (avoid recompiling JDK via Ant)
+# Prepare build configuration for USER sources (with enhanced project support)
 BUILD_USER_XML_PATH="/app/build-user.xml"
-echo "Generating Ant build file for user sources at $BUILD_USER_XML_PATH"
-if [ -n "${CATALINA_HOME:-}" ] && [ -d "$CATALINA_HOME" ]; then
-cat > "$BUILD_USER_XML_PATH" << 'EOF'
-<project name="codeql-build-user" basedir="." default="build">
-  <property name="user.dir" value="user-source"/>
-  <property name="build.dir" value="build_user_classes"/>
-  <property name="tomcat.dir" value="${env.CATALINA_HOME}"/>
-  <path id="user-classpath">
-    <pathelement path="${tomcat.dir}/lib"/>
-    <fileset dir="${tomcat.dir}/lib">
-      <include name="*.jar"/>
-    </fileset>
-    <fileset dir="${tomcat.dir}/bin">
-      <include name="*.jar"/>
-    </fileset>
-    <fileset dir="${user.dir}/lib">
-      <include name="*.jar"/>
-    </fileset>
-  </path>
-  <target name="build" description="Compile user project sources only">
-    <mkdir dir="${build.dir}"/>
-    <javac destdir="${build.dir}" source="8" target="8" fork="true" optimize="off" debug="on" failonerror="false">
-      <src path="${user.dir}"/>
-      <classpath refid="user-classpath"/>
-    </javac>
-  </target>
-</project>
-EOF
+echo "Generating build configuration for user sources at $BUILD_USER_XML_PATH"
+
+if $USR_PRESENT; then
+    # 使用项目检测器生成构建配置
+    echo "Detecting project type and generating build configuration..."
+    PROJECT_INFO=$(bash /app/scripts/project-detector.sh "$USER_SOURCE_DIR" "$BUILD_USER_XML_PATH")
+    echo "Project detection result: $PROJECT_INFO"
 else
-cat > "$BUILD_USER_XML_PATH" << 'EOF'
-<project name="codeql-build-user" basedir="." default="build">
-  <property name="user.dir" value="user-source"/>
-  <property name="build.dir" value="build_user_classes"/>
-  <target name="build" description="Compile user project sources only">
-    <mkdir dir="${build.dir}"/>
-    <javac destdir="${build.dir}" source="8" target="8" fork="true" optimize="off" debug="on" failonerror="false">
-      <src path="${user.dir}"/>
-    </javac>
-  </target>
+    # 生成默认的空构建配置
+    cat > "$BUILD_USER_XML_PATH" << 'EOF'
+<project name="codeql-build-empty" basedir="." default="build">
+    <target name="build" description="Empty build - no user sources">
+        <echo message="No user sources to build"/>
+    </target>
 </project>
 EOF
 fi
@@ -211,11 +239,11 @@ echo "Creating CodeQL database at: $DB_PATH"
 
 # Prepare command strings for each mode
 # Use double quotes for the -lc string to avoid mismatched single-quote issues
-HYBRID_CMD="/bin/bash -lc \"set -e; cd /app/source; if [ -f configure ]; then chmod +x configure || true; echo Running configure...; ./configure --with-boot-jdk=$JAVA_HOME --with-debug-level=slowdebug --enable-debug-symbols || true; fi; echo Running make all for OpenJDK...; make all DISABLE_HOTSPOT_OS_VERSION_CHECK=OK ZIP_DEBUGINFO_FILES=0; if [ -d /app/user-source ] && ls -A /app/user-source >/dev/null 2>&1; then echo Compiling user project via Ant...; ant -f /app/build-user.xml; else echo No user sources; skipping Ant step.; fi\""
+HYBRID_CMD="/bin/bash -lc \"set -e; cd /app/source; if [ -f configure ]; then chmod +x configure || true; echo Running configure...; ./configure --with-boot-jdk=$JAVA_HOME --with-debug-level=slowdebug || true; fi; echo Running make all for OpenJDK...; make all DISABLE_HOTSPOT_OS_VERSION_CHECK=OK ZIP_DEBUGINFO_FILES=0; if [ -d /app/user-source ] && ls -A /app/user-source >/dev/null 2>&1; then echo Compiling user project via Ant...; ant -f /app/build-user.xml; else echo No user sources; skipping Ant step.; fi\""
 
-JDK_ONLY_CMD="/bin/bash -lc \"set -e; cd /app/source; if [ -f configure ]; then chmod +x configure || true; echo Running configure...; ./configure --with-boot-jdk=$JAVA_HOME --with-debug-level=slowdebug --enable-debug-symbols || true; fi; echo Running make all for OpenJDK...; make all DISABLE_HOTSPOT_OS_VERSION_CHECK=OK ZIP_DEBUGINFO_FILES=0\""
+JDK_ONLY_CMD="/bin/bash -lc \"set -e; cd /app/source; if [ -f configure ]; then chmod +x configure || true; echo Running configure...; ./configure --with-boot-jdk=$JAVA_HOME --with-debug-level=slowdebug || true; fi; echo Running make all for OpenJDK...; make all DISABLE_HOTSPOT_OS_VERSION_CHECK=OK ZIP_DEBUGINFO_FILES=0\""
 
-USER_ONLY_CMD="/bin/bash -lc \"set -e; if [ -d /app/user-source ] && ls -A /app/user-source >/dev/null 2>&1; then echo Compiling user project via Ant...; ant -f /app/build-user.xml; else echo No user sources; exiting.; exit 1; fi\""
+USER_ONLY_CMD="/bin/bash -lc \"set -e; if [ -d /app/user-source ] && ls -A /app/user-source >/dev/null 2>&1; then echo Compiling user project via Ant...; ant -f /app/build-user.xml; else echo No user sources; skipping Ant step.; fi\""
 
 # Select command based on mode
 SELECTED_CMD="$HYBRID_CMD"

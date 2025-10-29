@@ -62,7 +62,7 @@ case "$JDK_VERSION" in
         git clone --depth 1 -b "$TAG" "https://github.com/$REPO.git" "$SOURCE_DIR"
         ;;
     "11")
-        REPO="openjdk/jdk11"
+        REPO="openjdk/jdk11u"
         if [ -n "$JDK_FULL_VERSION" ]; then
             TAG=$(fuzzy_match_tag "$REPO" "jdk-" "$JDK_FULL_VERSION" "\\+[0-9]+")
         fi
@@ -72,7 +72,7 @@ case "$JDK_VERSION" in
         git clone --depth 1 -b "$TAG" "https://github.com/$REPO.git" "$SOURCE_DIR"
         ;;
     "17")
-        REPO="openjdk/jdk17"
+        REPO="openjdk/jdk17u"
         if [ -n "$JDK_FULL_VERSION" ]; then
             TAG=$(fuzzy_match_tag "$REPO" "jdk-" "$JDK_FULL_VERSION" "\\+[0-9]+")
         fi
@@ -82,7 +82,7 @@ case "$JDK_VERSION" in
         git clone --depth 1 -b "$TAG" "https://github.com/$REPO.git" "$SOURCE_DIR"
         ;;
     "21")
-        REPO="openjdk/jdk21"
+        REPO="openjdk/jdk21u"
         if [ -n "$JDK_FULL_VERSION" ]; then
             TAG=$(fuzzy_match_tag "$REPO" "jdk-" "$JDK_FULL_VERSION" "\\+[0-9]+")
         fi

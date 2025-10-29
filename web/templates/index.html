@@ -1,0 +1,1345 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeQL Database Builder - Web管理界面</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        secondary: '#6366f1',
+                        success: '#10b981',
+                        warning: '#f59e0b',
+                        danger: '#ef4444',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .gradient-bg-1 {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .gradient-bg-2 {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        .gradient-bg-3 {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        }
+        .gradient-bg-4 {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        .log-viewer {
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            scroll-behavior: smooth;
+        }
+        
+        /* 自定义滚动条样式 - 增强版 */
+        .log-viewer::-webkit-scrollbar {
+            width: 16px;
+        }
+        
+        .log-viewer::-webkit-scrollbar-track {
+            background: #1a1a1a;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+        
+        .log-viewer::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, #666 0%, #444 100%);
+            border-radius: 8px;
+            border: 2px solid #1a1a1a;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
+        }
+        
+        .log-viewer::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, #777 0%, #555 100%);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
+        }
+        
+        .log-viewer::-webkit-scrollbar-thumb:active {
+            background: linear-gradient(180deg, #888 0%, #666 100%);
+        }
+        
+        .log-viewer::-webkit-scrollbar-corner {
+            background: #1a1a1a;
+        }
+        
+        /* 为其他容器也添加统一的滚动条样式 */
+        .scrollable::-webkit-scrollbar {
+            width: 12px;
+            height: 12px;
+        }
+        
+        .scrollable::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 6px;
+        }
+        
+        .scrollable::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, #c1c1c1 0%, #a1a1a1 100%);
+            border-radius: 6px;
+            border: 1px solid #f1f1f1;
+        }
+        
+        .scrollable::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, #a1a1a1 0%, #888 100%);
+        }
+        
+        /* Firefox 滚动条样式 */
+        .log-viewer {
+            scrollbar-width: auto;
+            scrollbar-color: #555 #2d2d2d;
+        }
+        
+        .scrollable {
+            scrollbar-width: auto;
+            scrollbar-color: #a1a1a1 #f1f1f1;
+        }
+        
+        /* 日志控制按钮样式 */
+        .log-controls {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        
+        .log-control-btn {
+            padding: 6px 12px;
+            background: #4f46e5;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            min-width: 80px;
+            justify-content: center;
+        }
+        
+        .log-control-btn:hover {
+            background: #4338ca;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .log-control-btn:active {
+            transform: translateY(0);
+        }
+        
+        .log-control-btn:disabled {
+            background: #6b7280;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        /* 日志状态指示器 */
+        .log-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-size: 12px;
+            color: #6b7280;
+        }
+        
+        .log-status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+            animation: pulse 2s infinite;
+        }
+        
+        .log-status-dot.inactive {
+            background: #6b7280;
+            animation: none;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 640px) {
+            .log-controls {
+                justify-content: center;
+            }
+            
+            .log-control-btn {
+                font-size: 11px;
+                padding: 5px 10px;
+                min-width: 70px;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- 导航栏 -->
+    <nav class="bg-gray-900 text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <i class="bi bi-code-square text-2xl mr-3"></i>
+                    <h1 class="text-xl font-bold">CodeQL Database Builder</h1>
+                </div>
+                <button onclick="refreshData()" 
+                        class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg transition-colors duration-200 flex items-center">
+                    <i class="bi bi-arrow-clockwise mr-2"></i>
+                    刷新
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- 左侧面板 - 配置和控制 -->
+            <div class="lg:col-span-1 space-y-6">
+                <!-- 统计信息 -->
+                <div class="gradient-bg-1 rounded-xl p-6 text-white shadow-lg">
+                    <h2 class="text-lg font-semibold mb-4 flex items-center">
+                        <i class="bi bi-graph-up mr-2"></i>
+                        构建统计
+                    </h2>
+                    <div class="grid grid-cols-2 gap-4 text-center">
+                        <div>
+                            <div class="text-2xl font-bold" id="totalBuilds">-</div>
+                            <div class="text-sm opacity-90">总构建数</div>
+                        </div>
+                        <div>
+                            <div class="text-2xl font-bold" id="successRate">-</div>
+                            <div class="text-sm opacity-90">成功率</div>
+                        </div>
+                        <div>
+                            <div class="text-2xl font-bold" id="avgDuration">-</div>
+                            <div class="text-sm opacity-90">平均时长(分)</div>
+                        </div>
+                        <div>
+                            <div class="text-2xl font-bold" id="compressionRate">-</div>
+                            <div class="text-sm opacity-90">压缩率</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Boot JDK管理 -->
+                <div class="gradient-bg-2 rounded-xl p-6 text-white shadow-lg">
+                    <h2 class="text-lg font-semibold mb-4 flex items-center">
+                        <i class="bi bi-cpu mr-2"></i>
+                        Boot JDK管理
+                    </h2>
+                    <button onclick="scanBootJDKs()" 
+                            class="bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg transition-all duration-200 mb-4 flex items-center">
+                        <i class="bi bi-search mr-2"></i>
+                        扫描JDK
+                    </button>
+                    <div id="bootJdkList" class="space-y-2 scrollable max-h-48 overflow-y-auto">
+                        <p class="opacity-90">加载中...</p>
+                    </div>
+                </div>
+
+                <!-- 构建配置 -->
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                    <div class="bg-gray-50 px-6 py-4 border-b">
+                        <h2 class="text-lg font-semibold flex items-center">
+                            <i class="bi bi-gear mr-2"></i>
+                            构建配置
+                        </h2>
+                    </div>
+                    <div class="p-6">
+                        <form id="buildForm" class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Boot JDK</label>
+                                <select id="bootJdkPath" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+                                    <option value="">自动选择</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">JDK版本</label>
+                                <select id="jdkVersion" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+                                    <option value="8">JDK 8</option>
+                                    <option value="11">JDK 11</option>
+                                    <option value="17" selected>JDK 17</option>
+                                    <option value="21">JDK 21</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">完整版本号</label>
+                                <input type="text" id="jdkFullVersion" placeholder="例如: 17.0.2"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">构建模式</label>
+                                <select id="buildMode" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+                                    <option value="hybrid" selected>混合模式</option>
+                                    <option value="jdk_only">仅JDK</option>
+                                    <option value="user_only">仅用户代码</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">数据库名称</label>
+                                <input type="text" id="dbName" placeholder="例如: codeql_jdk17"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+                            </div>
+                            <button type="submit" class="w-full bg-primary hover:bg-blue-600 text-white py-3 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center">
+                                <i class="bi bi-play-fill mr-2"></i>
+                                开始构建
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- 用户源码上传 -->
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                    <div class="bg-gray-50 px-6 py-4 border-b">
+                        <h2 class="text-lg font-semibold flex items-center">
+                            <i class="bi bi-upload mr-2"></i>
+                            源码上传
+                        </h2>
+                    </div>
+                    <div class="p-6">
+                        <form id="uploadForm" class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">选择文件</label>
+                                <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-primary transition-colors duration-200" 
+                                     id="dropZone">
+                                    <input type="file" id="fileInput" accept=".zip,.jar" class="hidden">
+                                    <i class="bi bi-cloud-upload text-4xl text-gray-400 mb-2"></i>
+                                    <p class="text-gray-600 mb-2">拖拽文件到此处或点击选择</p>
+                                    <p class="text-sm text-gray-500">支持 ZIP 和 JAR 文件</p>
+                                    <button type="button" onclick="document.getElementById('fileInput').click()" 
+                                            class="mt-3 bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg text-sm transition-colors duration-200">
+                                        选择文件
+                                    </button>
+                                </div>
+                                <div id="fileInfo" class="mt-3 hidden">
+                                    <div class="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                                        <div class="flex items-center">
+                                            <i class="bi bi-file-zip text-primary mr-2"></i>
+                                            <span id="fileName" class="text-sm font-medium"></span>
+                                            <span id="fileSize" class="text-xs text-gray-500 ml-2"></span>
+                                        </div>
+                                        <button type="button" onclick="clearFile()" class="text-red-500 hover:text-red-700">
+                                            <i class="bi bi-x-circle"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- JAR反编译选项 -->
+                            <div id="decompilerOptions" class="hidden">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">反编译器选择</label>
+                                <div class="space-y-2">
+                                    <label class="flex items-center">
+                                        <input type="radio" name="decompiler" value="procyon" checked 
+                                               class="text-primary focus:ring-primary">
+                                        <span class="ml-2 text-sm">Procyon (推荐)</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="radio" name="decompiler" value="fernflower" 
+                                               class="text-primary focus:ring-primary">
+                                        <span class="ml-2 text-sm">Fernflower</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="flex space-x-3">
+                                <button type="submit" class="flex-1 bg-success hover:bg-green-600 text-white py-2 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center">
+                                    <i class="bi bi-upload mr-2"></i>
+                                    上传文件
+                                </button>
+                                <button type="button" onclick="clearUserSource()" 
+                                        class="bg-gray-500 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center">
+                                    <i class="bi bi-trash mr-2"></i>
+                                    清空
+                                </button>
+                            </div>
+                        </form>
+                        
+                        <!-- 上传进度 -->
+                        <div id="uploadProgress" class="mt-4 hidden">
+                            <div class="flex justify-between text-sm text-gray-600 mb-1">
+                                <span>上传进度</span>
+                                <span id="uploadPercent">0%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div id="uploadBar" class="bg-success h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 存储统计 -->
+                <div class="gradient-bg-3 rounded-xl p-6 text-white shadow-lg">
+                    <h2 class="text-lg font-semibold mb-4 flex items-center">
+                        <i class="bi bi-hdd-stack mr-2"></i>
+                        存储统计
+                    </h2>
+                    <div id="storageStats" class="scrollable max-h-32 overflow-y-auto">
+                        <p class="opacity-90">加载中...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧面板 - 构建状态和历史 -->
+            <div class="lg:col-span-2 space-y-6">
+                <!-- 当前构建状态 -->
+                <div id="currentBuildCard" class="bg-white rounded-xl shadow-lg overflow-hidden hidden">
+                    <div class="bg-primary text-white px-6 py-4">
+                        <h2 class="text-lg font-semibold flex items-center">
+                            <i class="bi bi-clock mr-2"></i>
+                            当前构建
+                        </h2>
+                    </div>
+                    <div class="p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 id="currentBuildId" class="font-medium">-</h3>
+                            <div class="flex items-center space-x-2">
+                                <span id="currentBuildStatus" class="px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800">运行中</span>
+                                <button id="stopBuildBtn" onclick="stopCurrentBuild()" 
+                                        class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg text-sm transition-colors duration-200 flex items-center">
+                                    <i class="bi bi-stop-fill mr-1"></i>
+                                    中断
+                                </button>
+                            </div>
+                        </div>
+                        <div class="relative mb-4">
+                            <div class="w-full bg-gray-200 rounded-full h-6">
+                                <div id="buildProgress" class="bg-primary h-6 rounded-full transition-all duration-300 flex items-center justify-center" style="width: 0%">
+                                    <span id="progressText" class="text-white text-sm font-medium">0%</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex justify-between text-sm text-gray-600">
+                            <span>开始时间: <span id="buildStartTime">-</span></span>
+                            <span>预计剩余: <span id="estimatedTime">计算中...</span></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 标签页 -->
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                    <div class="border-b border-gray-200">
+                        <nav class="flex">
+                            <button id="builds-tab" onclick="switchTab('builds')" 
+                                    class="tab-button active px-6 py-4 text-sm font-medium border-b-2 border-primary text-primary">
+                                <i class="bi bi-clock-history mr-2"></i>
+                                构建历史
+                            </button>
+                            <button id="archives-tab" onclick="switchTab('archives')" 
+                                    class="tab-button px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                                <i class="bi bi-archive mr-2"></i>
+                                数据库压缩包
+                            </button>
+                        </nav>
+                    </div>
+
+                    <!-- 构建历史标签页 -->
+                    <div id="builds-content" class="tab-content p-6">
+                        <div id="buildHistory" class="scrollable max-h-96 overflow-y-auto">
+                            <p class="text-center text-gray-500">加载中...</p>
+                        </div>
+                    </div>
+
+                    <!-- 数据库压缩包标签页 -->
+                    <div id="archives-content" class="tab-content p-6 hidden">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-medium">数据库压缩包管理</h3>
+                            <button onclick="cleanupResiduals()" 
+                                    class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center">
+                                <i class="bi bi-trash mr-2"></i>
+                                清理残留
+                            </button>
+                        </div>
+                        <div id="archivesList" class="scrollable max-h-96 overflow-y-auto">
+                            <p class="text-center text-gray-500">加载中...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 日志查看模态框 -->
+    <div id="logModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl max-w-6xl w-full max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center p-6 border-b">
+                <h2 class="text-xl font-semibold flex items-center">
+                    <i class="bi bi-file-text mr-2"></i>
+                    构建日志
+                </h2>
+                <button onclick="closeLogModal()" class="text-gray-400 hover:text-gray-600">
+                    <i class="bi bi-x-lg text-xl"></i>
+                </button>
+            </div>
+            <div class="flex-1 p-6 overflow-hidden">
+                <div class="log-status" id="logStatus">
+                    <div class="log-status-dot inactive" id="logStatusDot"></div>
+                    <span id="logStatusText">日志已加载</span>
+                </div>
+                <div class="log-controls">
+                    <button class="log-control-btn" onclick="scrollToTop()">
+                        <i class="bi bi-arrow-up"></i> 顶部
+                    </button>
+                    <button class="log-control-btn" onclick="scrollToBottom()">
+                        <i class="bi bi-arrow-down"></i> 底部
+                    </button>
+                    <button class="log-control-btn" id="autoScrollBtn" onclick="toggleAutoScroll()">
+                        <i class="bi bi-arrow-down-circle"></i> 自动滚动
+                    </button>
+                    <button class="log-control-btn" onclick="refreshLog()">
+                        <i class="bi bi-arrow-clockwise"></i> 刷新
+                    </button>
+                </div>
+                <pre id="logContent" class="log-viewer p-4 rounded-lg h-full overflow-auto">加载中...</pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentBuildId = null;
+        let refreshInterval = null;
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadConfig();
+            loadStats();
+            loadBuildHistory();
+            loadBootJDKs();
+            loadStorageStats();
+            loadArchives();
+            
+            // 恢复构建状态（如果存在）
+            restoreBuildStatus();
+            
+            // 设置定时刷新
+            refreshInterval = setInterval(refreshData, 5000);
+        });
+        
+        // 恢复构建状态
+        function restoreBuildStatus() {
+            const buildId = localStorage.getItem('currentBuildId');
+            if (buildId) {
+                currentBuildId = buildId;
+                
+                // 显示当前构建卡片
+                document.getElementById('currentBuildCard').classList.remove('hidden');
+                document.getElementById('currentBuildId').textContent = buildId;
+                
+                // 恢复开始时间
+                const startTime = localStorage.getItem('buildStartTime');
+                if (startTime) {
+                    document.getElementById('buildStartTime').textContent = startTime;
+                }
+                
+                // 恢复构建状态
+                const statusJson = localStorage.getItem('buildStatus');
+                if (statusJson) {
+                    try {
+                        const status = JSON.parse(statusJson);
+                        
+                        // 更新进度条
+                        const progress = status.progress || 0;
+                        document.getElementById('buildProgress').style.width = progress + '%';
+                        document.getElementById('progressText').textContent = Math.round(progress) + '%';
+                        
+                        // 更新状态
+                        const statusElement = document.getElementById('currentBuildStatus');
+                        statusElement.textContent = getStatusText(status.status);
+                        statusElement.className = getStatusClass(status.status) + ' px-3 py-1 rounded-full text-sm font-medium';
+                        
+                        // 如果构建仍在运行，继续监控
+                        if (status.status === 'running') {
+                            monitorBuild(buildId);
+                        }
+                    } catch (error) {
+                        console.error('恢复构建状态失败:', error);
+                    }
+                }
+            }
+        }
+
+        // 标签页切换
+        function switchTab(tabName) {
+            // 隐藏所有标签页内容
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.add('hidden');
+            });
+            
+            // 移除所有标签按钮的激活状态
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.classList.remove('active', 'border-primary', 'text-primary');
+                button.classList.add('border-transparent', 'text-gray-500');
+            });
+            
+            // 显示选中的标签页内容
+            document.getElementById(tabName + '-content').classList.remove('hidden');
+            
+            // 激活选中的标签按钮
+            const activeButton = document.getElementById(tabName + '-tab');
+            activeButton.classList.add('active', 'border-primary', 'text-primary');
+            activeButton.classList.remove('border-transparent', 'text-gray-500');
+        }
+
+        // 模态框控制 - 已移动到日志功能区域
+
+        // 加载配置
+        async function loadConfig() {
+            try {
+                const response = await fetch('/api/config');
+                const config = await response.json();
+                
+                document.getElementById('jdkVersion').value = config.jdk_version;
+                document.getElementById('jdkFullVersion').value = config.jdk_full_version;
+                document.getElementById('buildMode').value = config.build_mode;
+                document.getElementById('dbName').value = config.db_name;
+            } catch (error) {
+                console.error('加载配置失败:', error);
+            }
+        }
+
+        // 加载Boot JDK列表
+        async function loadBootJDKs() {
+            try {
+                const response = await fetch('/api/boot-jdks');
+                const jdks = await response.json();
+                
+                const bootJdkSelect = document.getElementById('bootJdkPath');
+                const bootJdkList = document.getElementById('bootJdkList');
+                
+                // 清空选项
+                bootJdkSelect.innerHTML = '<option value="">自动选择</option>';
+                
+                if (jdks.length === 0) {
+                    bootJdkList.innerHTML = '<p class="opacity-90">未发现Boot JDK</p>';
+                    return;
+                }
+                
+                // 填充选择框
+                jdks.forEach(jdk => {
+                    const option = document.createElement('option');
+                    option.value = jdk.path;
+                    option.textContent = `${jdk.vendor} ${jdk.version} (${jdk.size_mb}MB)`;
+                    bootJdkSelect.appendChild(option);
+                });
+                
+                // 显示JDK列表
+                let html = '';
+                jdks.forEach(jdk => {
+                    html += `
+                        <div class="bg-white bg-opacity-20 rounded-lg p-3 mb-2">
+                            <div class="flex justify-between items-center">
+                                <span class="font-medium">JDK ${jdk.major_version}</span>
+                                <span class="text-sm opacity-90">${jdk.size_mb}MB</span>
+                            </div>
+                            <div class="text-sm opacity-90">${jdk.vendor} ${jdk.version}</div>
+                        </div>
+                    `;
+                });
+                bootJdkList.innerHTML = html;
+                
+            } catch (error) {
+                console.error('加载Boot JDK失败:', error);
+            }
+        }
+
+        // 扫描Boot JDK
+        async function scanBootJDKs() {
+            try {
+                const response = await fetch('/api/boot-jdks/scan', { method: 'POST' });
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    loadBootJDKs();
+                } else {
+                    alert('扫描失败: ' + result.message);
+                }
+            } catch (error) {
+                alert('扫描失败: ' + error.message);
+            }
+        }
+
+        // 加载存储统计
+        async function loadStorageStats() {
+            try {
+                const response = await fetch('/api/storage-stats');
+                const stats = await response.json();
+                
+                const storageDiv = document.getElementById('storageStats');
+                if (Object.keys(stats).length === 0) {
+                    storageDiv.innerHTML = '<p class="opacity-90">暂无数据</p>';
+                    return;
+                }
+                
+                storageDiv.innerHTML = `
+                    <div class="grid grid-cols-2 gap-4 text-center">
+                        <div>
+                            <div class="text-xl font-bold">${stats.total_archives || 0}</div>
+                            <div class="text-sm opacity-90">压缩包数量</div>
+                        </div>
+                        <div>
+                            <div class="text-xl font-bold">${(stats.total_compressed_size_mb || 0).toFixed(1)}MB</div>
+                            <div class="text-sm opacity-90">总大小</div>
+                        </div>
+                    </div>
+                    <div class="mt-4 pt-4 border-t border-white border-opacity-20 text-center">
+                        <div class="text-sm opacity-90">节省空间: ${(stats.space_saved_mb || 0).toFixed(1)}MB</div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('加载存储统计失败:', error);
+            }
+        }
+
+        // 加载压缩包列表
+        async function loadArchives() {
+            try {
+                const response = await fetch('/api/database-archives');
+                const archives = await response.json();
+                
+                const archivesDiv = document.getElementById('archivesList');
+                if (archives.length === 0) {
+                    archivesDiv.innerHTML = '<p class="text-center text-gray-500">暂无压缩包</p>';
+                    return;
+                }
+                
+                let html = '';
+                archives.forEach(archive => {
+                    const createdTime = new Date(archive.created_time).toLocaleString();
+                    const compressionRatio = archive.compression_ratio.toFixed(1);
+                    
+                    html += `
+                        <div class="border-l-4 border-primary bg-gray-50 rounded-lg p-4 mb-4">
+                            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+                                <div class="flex-1">
+                                    <h4 class="font-medium text-gray-900 mb-1">${archive.database_name}</h4>
+                                    <p class="text-sm text-gray-600 mb-1">
+                                        ${archive.original_size_mb}MB → ${archive.compressed_size_mb}MB (${compressionRatio}%)
+                                    </p>
+                                    <p class="text-sm text-gray-500">创建时间: ${createdTime}</p>
+                                </div>
+                                <div class="flex flex-col sm:flex-row gap-2">
+                                    <button onclick="downloadArchive('${archive.archive_name}')" 
+                                            class="bg-primary hover:bg-blue-600 text-white px-3 py-2 rounded-lg text-sm transition-colors duration-200 flex items-center justify-center">
+                                        <i class="bi bi-download mr-1"></i> 下载
+                                    </button>
+                                    <button onclick="extractArchive('${archive.archive_name}')" 
+                                            class="bg-success hover:bg-green-600 text-white px-3 py-2 rounded-lg text-sm transition-colors duration-200 flex items-center justify-center">
+                                        <i class="bi bi-box-arrow-up mr-1"></i> 解压
+                                    </button>
+                                    <button onclick="deleteArchive('${archive.archive_name}')" 
+                                            class="bg-danger hover:bg-red-600 text-white px-3 py-2 rounded-lg text-sm transition-colors duration-200 flex items-center justify-center">
+                                        <i class="bi bi-trash mr-1"></i> 删除
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                archivesDiv.innerHTML = html;
+            } catch (error) {
+                console.error('加载压缩包列表失败:', error);
+            }
+        }
+
+        // 下载压缩包
+        function downloadArchive(archiveName) {
+            window.open(`/api/database-archives/${archiveName}/download`, '_blank');
+        }
+
+        // 解压压缩包
+        async function extractArchive(archiveName) {
+            if (!confirm(`确定要解压 ${archiveName} 吗？`)) return;
+            
+            try {
+                const response = await fetch(`/api/database-archives/${archiveName}/extract`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    alert('解压成功！');
+                } else {
+                    alert('解压失败: ' + result.message);
+                }
+            } catch (error) {
+                alert('解压失败: ' + error.message);
+            }
+        }
+
+        // 删除压缩包
+        async function deleteArchive(archiveName) {
+            if (!confirm(`确定要删除 ${archiveName} 吗？此操作不可恢复！`)) return;
+            
+            try {
+                const response = await fetch(`/api/database-archives/${archiveName}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    loadArchives();
+                    loadStorageStats();
+                } else {
+                    alert('删除失败: ' + result.message);
+                }
+            } catch (error) {
+                alert('删除失败: ' + error.message);
+            }
+        }
+
+        // 清理残留文件
+        async function cleanupResiduals() {
+            if (!confirm('确定要清理残留的数据库文件吗？')) return;
+            
+            try {
+                const response = await fetch('/api/database-archives/cleanup', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    alert('清理完成！');
+                    loadStorageStats();
+                } else {
+                    alert('清理失败: ' + result.message);
+                }
+            } catch (error) {
+                alert('清理失败: ' + error.message);
+            }
+        }
+
+        // 加载统计信息
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const stats = await response.json();
+                
+                document.getElementById('totalBuilds').textContent = stats.total_builds;
+                document.getElementById('successRate').textContent = stats.success_rate + '%';
+                document.getElementById('avgDuration').textContent = Math.round(stats.avg_duration / 60);
+                document.getElementById('compressionRate').textContent = stats.compression_rate + '%';
+            } catch (error) {
+                console.error('加载统计信息失败:', error);
+            }
+        }
+
+        // 加载构建历史
+        async function loadBuildHistory() {
+            try {
+                const response = await fetch('/api/builds');
+                const builds = await response.json();
+                
+                const historyDiv = document.getElementById('buildHistory');
+                if (builds.length === 0) {
+                    historyDiv.innerHTML = '<p class="text-center text-gray-500">暂无构建历史</p>';
+                    return;
+                }
+                
+                let html = '';
+                builds.forEach(build => {
+                    const statusClass = getStatusClass(build.status);
+                    const duration = build.duration ? Math.round(build.duration / 60) + '分钟' : '-';
+                    const compressed = build.compressed ? '<i class="bi bi-archive text-success ml-2" title="已压缩"></i>' : '';
+                    
+                    html += `
+                        <div class="bg-white border border-gray-200 rounded-lg p-4 mb-3 hover:shadow-md transition-shadow duration-200">
+                            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                                <div class="flex-1">
+                                    <div class="flex items-center">
+                                        <span class="font-medium">${build.build_id}</span>
+                                        ${compressed}
+                                    </div>
+                                    <div class="text-sm text-gray-600 mt-1">
+                                        JDK ${build.jdk_version} ${build.jdk_full_version || ''}
+                                    </div>
+                                    ${build.boot_jdk_path ? `<div class="text-sm text-gray-500 mt-1">Boot JDK: ${build.boot_jdk_path}</div>` : ''}
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <span class="${statusClass} px-3 py-1 rounded-full text-sm font-medium">${getStatusText(build.status)}</span>
+                                    <span class="text-sm text-gray-500">${duration}</span>
+                                    <button onclick="viewLog('${build.build_id}')" 
+                                            class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm transition-colors duration-200">
+                                        <i class="bi bi-file-text"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                historyDiv.innerHTML = html;
+            } catch (error) {
+                console.error('加载构建历史失败:', error);
+            }
+        }
+
+        // 提交构建表单
+        document.getElementById('buildForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const config = {
+                jdk_version: document.getElementById('jdkVersion').value,
+                jdk_full_version: document.getElementById('jdkFullVersion').value,
+                build_mode: document.getElementById('buildMode').value,
+                db_name: document.getElementById('dbName').value,
+                boot_jdk_path: document.getElementById('bootJdkPath').value
+            };
+            
+            try {
+                const response = await fetch('/api/build', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(config)
+                });
+                
+                const result = await response.json();
+                currentBuildId = result.build_id;
+                
+                // 显示当前构建卡片
+                document.getElementById('currentBuildCard').classList.remove('hidden');
+                document.getElementById('currentBuildId').textContent = currentBuildId;
+                document.getElementById('buildStartTime').textContent = new Date().toLocaleString();
+                
+                // 开始监控构建进度
+                monitorBuild(currentBuildId);
+                
+            } catch (error) {
+                alert('启动构建失败: ' + error.message);
+            }
+        });
+
+        // 监控构建进度
+        async function monitorBuild(buildId) {
+            try {
+                const response = await fetch(`/api/build/${buildId}/status`);
+                const status = await response.json();
+                
+                // 更新进度条
+                const progress = status.progress || 0;
+                // 确保进度值为数字并限制在0-100之间
+                const safeProgress = Math.min(Math.max(parseFloat(progress) || 0, 0), 100);
+                document.getElementById('buildProgress').style.width = safeProgress + '%';
+                document.getElementById('progressText').textContent = Math.round(safeProgress) + '%';
+                
+                // 更新状态
+                const statusElement = document.getElementById('currentBuildStatus');
+                statusElement.textContent = getStatusText(status.status);
+                statusElement.className = getStatusClass(status.status) + ' px-3 py-1 rounded-full text-sm font-medium';
+                
+                // 保存构建状态到localStorage
+                localStorage.setItem('currentBuildId', buildId);
+                localStorage.setItem('buildStatus', JSON.stringify(status));
+                localStorage.setItem('buildStartTime', document.getElementById('buildStartTime').textContent);
+                
+                // 估算剩余时间
+                if (status.status === 'running' && progress > 0) {
+                    const elapsed = (Date.now() - new Date(status.start_time).getTime()) / 1000;
+                    const estimated = (elapsed / progress * 100 - elapsed) / 60;
+                    document.getElementById('estimatedTime').textContent = 
+                        estimated > 0 ? Math.round(estimated) + '分钟' : '即将完成';
+                }
+                
+                // 如果构建完成，停止监控
+                if (status.status !== 'running') {
+                    setTimeout(() => {
+                        document.getElementById('currentBuildCard').classList.add('hidden');
+                        currentBuildId = null;
+                        localStorage.removeItem('currentBuildId');
+                        localStorage.removeItem('buildStatus');
+                        localStorage.removeItem('buildStartTime');
+                        refreshData();
+                    }, 3000);
+                } else {
+                    // 继续监控
+                    setTimeout(() => monitorBuild(buildId), 2000);
+                }
+                
+            } catch (error) {
+                console.error('监控构建失败:', error);
+            }
+        }
+
+        // 日志滚动相关变量
+        let autoScrollEnabled = false;
+        let currentLogBuildId = null;
+        let logRefreshInterval = null;
+
+        // 更新日志状态指示器
+        function updateLogStatus(isActive, text) {
+            const dot = document.getElementById('logStatusDot');
+            const statusText = document.getElementById('logStatusText');
+            
+            if (isActive) {
+                dot.classList.remove('inactive');
+                statusText.textContent = text || '实时更新中...';
+            } else {
+                dot.classList.add('inactive');
+                statusText.textContent = text || '日志已加载';
+            }
+        }
+
+        // 查看日志
+        async function viewLog(buildId) {
+            try {
+                currentLogBuildId = buildId;
+                updateLogStatus(false, '加载日志中...');
+                
+                const response = await fetch(`/api/logs/${buildId}`);
+                const logContent = await response.text();
+                
+                document.getElementById('logContent').textContent = logContent;
+                document.getElementById('logModal').classList.remove('hidden');
+                updateLogStatus(false, '日志已加载');
+                
+                // 如果启用了自动滚动，滚动到底部
+                if (autoScrollEnabled) {
+                    scrollToBottom();
+                }
+            } catch (error) {
+                updateLogStatus(false, '加载失败');
+                alert('加载日志失败: ' + error.message);
+            }
+        }
+
+        // 滚动到顶部
+        function scrollToTop() {
+            const logContent = document.getElementById('logContent');
+            logContent.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        }
+
+        // 滚动到底部
+        function scrollToBottom() {
+            const logContent = document.getElementById('logContent');
+            logContent.scrollTo({
+                top: logContent.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
+
+        // 切换自动滚动
+        function toggleAutoScroll() {
+            autoScrollEnabled = !autoScrollEnabled;
+            const btn = document.getElementById('autoScrollBtn');
+            
+            if (autoScrollEnabled) {
+                btn.innerHTML = '<i class="bi bi-pause-circle"></i> 停止自动滚动';
+                btn.style.background = '#dc2626';
+                updateLogStatus(true, '自动滚动已启用');
+                scrollToBottom();
+                
+                // 开始定期刷新日志
+                if (currentLogBuildId) {
+                    startLogRefresh();
+                }
+            } else {
+                btn.innerHTML = '<i class="bi bi-arrow-down-circle"></i> 自动滚动';
+                btn.style.background = '#4f46e5';
+                updateLogStatus(false, '自动滚动已停止');
+                
+                // 停止定期刷新
+                stopLogRefresh();
+            }
+        }
+
+        // 刷新日志
+        async function refreshLog() {
+            if (currentLogBuildId) {
+                try {
+                    updateLogStatus(true, '刷新日志中...');
+                    const response = await fetch(`/api/logs/${currentLogBuildId}`);
+                    const logContent = await response.text();
+                    const logElement = document.getElementById('logContent');
+                    
+                    // 保存当前滚动位置
+                    const wasAtBottom = logElement.scrollTop + logElement.clientHeight >= logElement.scrollHeight - 10;
+                    
+                    logElement.textContent = logContent;
+                    
+                    // 如果之前在底部或启用了自动滚动，保持在底部
+                    if (wasAtBottom || autoScrollEnabled) {
+                        scrollToBottom();
+                    }
+                    
+                    updateLogStatus(autoScrollEnabled, autoScrollEnabled ? '实时更新中...' : '日志已刷新');
+                } catch (error) {
+                    updateLogStatus(false, '刷新失败');
+                    console.error('刷新日志失败:', error);
+                }
+            }
+        }
+
+        // 开始日志自动刷新
+        function startLogRefresh() {
+            stopLogRefresh(); // 先停止之前的刷新
+            logRefreshInterval = setInterval(refreshLog, 2000); // 每2秒刷新一次
+        }
+
+        // 停止日志自动刷新
+        function stopLogRefresh() {
+            if (logRefreshInterval) {
+                clearInterval(logRefreshInterval);
+                logRefreshInterval = null;
+            }
+        }
+
+        // 关闭日志模态框
+        function closeLogModal() {
+            document.getElementById('logModal').classList.add('hidden');
+            autoScrollEnabled = false;
+            currentLogBuildId = null;
+            stopLogRefresh();
+            
+            // 重置自动滚动按钮
+            const btn = document.getElementById('autoScrollBtn');
+            btn.innerHTML = '<i class="bi bi-arrow-down-circle"></i> 自动滚动';
+            btn.style.background = '#4f46e5';
+            
+            // 重置状态指示器
+            updateLogStatus(false, '日志已加载');
+        }
+
+        // 刷新数据
+        function refreshData() {
+            loadStats();
+            loadBuildHistory();
+            loadStorageStats();
+            loadArchives();
+        }
+
+        // 获取状态样式类
+        function getStatusClass(status) {
+            switch (status) {
+                case 'success': return 'bg-green-100 text-green-800';
+                case 'failed': return 'bg-red-100 text-red-800';
+                case 'running': return 'bg-blue-100 text-blue-800';
+                case 'error': return 'bg-yellow-100 text-yellow-800';
+                default: return 'bg-gray-100 text-gray-800';
+            }
+        }
+
+        // 获取状态文本
+        function getStatusText(status) {
+            switch (status) {
+                case 'success': return '成功';
+                case 'failed': return '失败';
+                case 'running': return '运行中';
+                case 'error': return '错误';
+                default: return '未知';
+            }
+        }
+
+        // 页面卸载时清理定时器
+        window.addEventListener('beforeunload', function() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+        });
+
+        // 文件上传相关功能
+        let selectedFile = null;
+
+        // 文件输入变化处理
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            handleFileSelect(e.target.files[0]);
+        });
+
+        // 拖拽上传功能
+        const dropZone = document.getElementById('dropZone');
+        
+        dropZone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            dropZone.classList.add('border-primary', 'bg-blue-50');
+        });
+        
+        dropZone.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            dropZone.classList.remove('border-primary', 'bg-blue-50');
+        });
+        
+        dropZone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            dropZone.classList.remove('border-primary', 'bg-blue-50');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileSelect(files[0]);
+            }
+        });
+
+        // 处理文件选择
+        function handleFileSelect(file) {
+            if (!file) return;
+            
+            const allowedTypes = ['application/zip', 'application/x-zip-compressed', 'application/java-archive'];
+            const allowedExtensions = ['.zip', '.jar'];
+            const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+            
+            if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension)) {
+                alert('只支持 ZIP 和 JAR 文件！');
+                return;
+            }
+            
+            selectedFile = file;
+            
+            // 显示文件信息
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileSize').textContent = formatFileSize(file.size);
+            document.getElementById('fileInfo').classList.remove('hidden');
+            
+            // 如果是JAR文件，显示反编译选项
+            if (fileExtension === '.jar') {
+                document.getElementById('decompilerOptions').classList.remove('hidden');
+            } else {
+                document.getElementById('decompilerOptions').classList.add('hidden');
+            }
+        }
+
+        // 格式化文件大小
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // 清除选择的文件
+        function clearFile() {
+            selectedFile = null;
+            document.getElementById('fileInput').value = '';
+            document.getElementById('fileInfo').classList.add('hidden');
+            document.getElementById('decompilerOptions').classList.add('hidden');
+            document.getElementById('uploadProgress').classList.add('hidden');
+        }
+
+        // 上传表单提交
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            if (!selectedFile) {
+                alert('请先选择文件！');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            
+            // 如果是JAR文件，添加反编译器选择
+            if (selectedFile.name.toLowerCase().endsWith('.jar')) {
+                const decompiler = document.querySelector('input[name="decompiler"]:checked').value;
+                formData.append('decompiler', decompiler);
+            }
+            
+            try {
+                // 显示上传进度
+                document.getElementById('uploadProgress').classList.remove('hidden');
+                
+                const xhr = new XMLHttpRequest();
+                
+                // 上传进度监听
+                xhr.upload.addEventListener('progress', function(e) {
+                    if (e.lengthComputable) {
+                        const percentComplete = (e.loaded / e.total) * 100;
+                        document.getElementById('uploadBar').style.width = percentComplete + '%';
+                        document.getElementById('uploadPercent').textContent = Math.round(percentComplete) + '%';
+                    }
+                });
+                
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
+                        const result = JSON.parse(xhr.responseText);
+                        if (result.status === 'success') {
+                            alert('文件上传成功！');
+                            clearFile();
+                        } else {
+                            alert('上传失败: ' + result.message);
+                        }
+                    } else {
+                        alert('上传失败，请重试！');
+                    }
+                    document.getElementById('uploadProgress').classList.add('hidden');
+                };
+                
+                xhr.onerror = function() {
+                    alert('上传失败，请检查网络连接！');
+                    document.getElementById('uploadProgress').classList.add('hidden');
+                };
+                
+                xhr.open('POST', '/api/upload-source');
+                xhr.send(formData);
+                
+            } catch (error) {
+                alert('上传失败: ' + error.message);
+                document.getElementById('uploadProgress').classList.add('hidden');
+            }
+        });
+
+        // 清空用户源码
+        async function clearUserSource() {
+            if (!confirm('确定要清空所有用户源码吗？')) return;
+            
+            try {
+                const response = await fetch('/api/clear-user-source', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    alert('用户源码已清空！');
+                } else {
+                    alert('清空失败: ' + result.message);
+                }
+            } catch (error) {
+                alert('清空失败: ' + error.message);
+            }
+        }
+
+        // 中断当前构建
+        async function stopCurrentBuild() {
+            if (!currentBuildId) return;
+            
+            if (!confirm('确定要中断当前构建吗？')) return;
+            
+            try {
+                const response = await fetch(`/api/build/${currentBuildId}/stop`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    alert('构建已中断！');
+                    document.getElementById('currentBuildCard').classList.add('hidden');
+                    currentBuildId = null;
+                    refreshData();
+                } else {
+                    alert('中断失败: ' + result.message);
+                }
+            } catch (error) {
+                alert('中断失败: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>

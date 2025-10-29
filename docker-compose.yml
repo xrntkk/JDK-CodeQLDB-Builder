@@ -6,16 +6,21 @@ services:
     environment:
       - TZ=Asia/Shanghai
       - DISABLE_HOTSPOT_OS_VERSION_CHECK=ok
-      - AUTO_BUILD=true
+      - AUTO_BUILD=false
       - BUILD_MODE=hybrid   # 支持: hybrid | jdk_only | user_only
-      - DB_NAME=hybrid      # 输出数据库名字
-      - JDK_FULL_VERSION="8u111"  # 完整版本号，这里使用 JDK 8u111 版本
-      - JDK_VERSION=8 # 主版本号: 8, 11, 17, 21
+      - DB_NAME=codeql_jdk17.0.2      # 输出数据库名字
+      - JDK_VERSION=17 # 主版本号: 8, 11, 17, 21
+      - JDK_FULL_VERSION=17.0.2  # 完整版本号，这里使用 JDK 17.0.2 版本
+      - WEB_UI_ENABLED=true  # 启用Web管理界面
     volumes:
       - ./data/bootjdk:/app/bootjdk
       - ./data/source:/app/source
       - ./data/codeql:/app/codeql
       - ./data/database:/app/database
       - ./data/user-source:/app/user-source
+      - ./cache:/app/cache  # 缓存目录
+      - ./logs:/app/logs    # 日志目录
+    ports:
+      - "8085:8080"  # Web管理界面端口
     tty: true
     stdin_open: true
