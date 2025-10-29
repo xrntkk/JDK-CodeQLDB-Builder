@@ -86,7 +86,7 @@ RUN apt-get install -y bc && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # 安装Python和Flask（用于Web界面）
 RUN apt-get update --fix-missing && apt-get install -y python3 python3-pip && \
-    pip3 install flask && \
+    pip3 install flask requests && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # 默认 CodeQL 运行时主版本为 17（可在 docker-compose.yml 中覆盖 CODEQL_RUNTIME_MAJOR）
