@@ -1,6 +1,6 @@
 # JDK CodeQL Database Builder
 
-> 本项目基于 [h3h3qaq/JDK-CodeQLDB-Builder](https://github.com/h3h3qaq/JDK-CodeQLDB-Builder) 改造，新增了现代化Web管理界面、智能缓存、Maven/Gradle/Kotlin支持等功能。采用Tailwind CSS响应式设计，完全使用Claude3.5进行重构升级。
+> 本项目基于 [h3h3qaq/JDK-CodeQLDB-Builder](https://github.com/h3h3qaq/JDK-CodeQLDB-Builder) 改造，新增了现代化Web管理界面、智能缓存、Maven/Gradle/Kotlin支持等功能。采用Tailwind CSS响应式设计，完全使用Claude3.5进行重构升级（没有一点技术，只有纯粹的拷打）。
 
 
 > 🚀 **现代化的 CodeQL 数据库构建平台**  
